@@ -1,14 +1,5 @@
 shinyServer(function(input, output, session) {
 
-  createProjectDefinition <- function() {
-    data.frame(id = getComputationInfo("id"),
-               compType = getComputationInfo("compType"),
-               projectName = getComputationInfo("projectName"),
-               projectDesc = getComputationInfo("projectDesc"),
-               formula = getComputationInfo("formula"),
-               stringsAsFactors=FALSE)
-  }
-
   observe({
     if (input$exitApp > 0) stopApp(TRUE)
   })
@@ -24,8 +15,8 @@ shinyServer(function(input, output, session) {
   ## output$formulaChecked
   ## output$definitionSaved
 
-  ## When the user chooses a file or Redcap source or Database source
-  ## and clicks on the "Load Data" button this function is triggered
+  ## When the user chooses a file and clicks on the "Load Data" button
+  ## this function is triggered
   output$dataFileContentSummary <- renderPrint({
     if (input$loadData == 0) return("")
 
@@ -87,7 +78,7 @@ shinyServer(function(input, output, session) {
 
       if (is.data.frame(dataResult)){
         setComputationInfo("data", dataResult) ## Store data object
-        updateTabsetPanel(session, inputId="navigationList", selected="Formula Check")
+        updateTabsetPanel(session, inputId="navigationList", selected="Sanity Check")
         str(dataResult)
       } else {
         cat('Error!', dataResult$message)
@@ -97,64 +88,46 @@ shinyServer(function(input, output, session) {
 
   output$dataLoaded <- reactive({
     if (input$loadData == 0) return()
-    ifelse(is.data.frame(getComputationInfo("data")), "Data loaded; Proceed to Formula Check", "")
+    ifelse(is.data.frame(getComputationInfo("data")), "Data Loaded; Proceed to Sanity Check", "")
   })
 
-  ## When the user clicks on the "Check Formula" button
+  ## When the user clicks on the "Check Sanity" button
   ## this function is triggered
-  output$checkFormulaResult <- renderPrint({
-    if (input$checkFormula == 0) return()
+  output$sanityCheckResult <- reactive({
+    if (input$checkSanity == 0) return()
+    formula <- getComputationInfo("formula")
     isolate({
       result <- tryCatch(
-        { CoxWorker$new(formula = as.formula(input$formula), data=getComputationInfo("data")) },
+        { CoxWorker$new(formula = as.formula(formula), data=getComputationInfo("data")) },
         warning = function(x) x,
         error = function(x) x)
       if ("CoxWorker" %in% class(result)) { ## Success
-        setComputationInfo("formula", input$formula)
-        ## At this point, generate the definition id too.
-        ## object <- list(compType = getComputationInfo("compType"),
-        ##                projectName = getComputationInfo("projectName"),
-        ##                projectDesc = getComputationInfo("projectDesc"),
-        ##                formula = getComputationInfo("formula"),
-        ##                random = runif(10))
-        setComputationInfo("id", generateId(list(random=runif(10))))
-        sprintf("Formula '%s' is OK!", input$formula)
+        "Success: data matches formula. Send to Opencpu Server."
       } else {
-        cat("Error!", result$message)
+        paste("Error!", result$message)
       }
     })
   })
 
-  output$formulaChecked <- reactive({
-    if (input$checkFormula == 0) return()
-    ifelse(is.null(getComputationInfo("formula")), "", "Formula Checked; Proceed to Output Result")
+  output$populateResult <- renderPrint({
+    if (input$populateServer == 0) return()
+    isolate({
+      shiny::validate(need(input$siteName != "", "Please enter a site name"))
+      shiny::validate(need(input$ocpuURL != "", "Please enter an opencpu URL"))
+      site <- list(name = input$siteName, url = input$ocpuURL)
+      defn <- makeDefinition(getComputationInfo("compType"))
+      data <- getComputationInfo("data")
+      result <- tryCatch(uploadNewComputation(site=site, defn=defn, data=data),
+                         error = function(x) x,
+                         warning = function(x) x)
+      if (inherits(result, "error") ) {
+        "Error: Uploading the definition to server"
+      } else {
+        ifelse(result, "Success: definition uploaded to server",
+               "Error while uploading definition to server")
+      }
+    })
   })
 
-
-  output$outputResult <- renderPrint({
-    if (input$saveDefinition == 0) return()
-    defn <- createProjectDefinition()
-    str(defn)
-  })
-
-  output$definitionSaved <- reactive({
-    if (input$saveDefinition == 0) return()
-    defn <- createProjectDefinition()
-    ##defnPath <- getConfig()$defnPath
-    ##dirName <- paste(defnPath, defn$id, sep=.Platform$file.sep)
-    dirName <- getComputationInfo("workingDir")
-    fileName <- paste(dirName, input$outputFile, sep=.Platform$file.sep)
-    result <- tryCatch(
-      {
-        ##dir.create(dirName)
-        saveRDS(object = defn, file=fileName)
-      },
-      error = function(x) x)
-    if (inherits(result, "error")) {
-      paste("Error!", result$message)
-    } else {
-      paste0("Definition saved to ", input$outputFile)
-    }
-  })
 })
 
