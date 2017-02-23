@@ -30,7 +30,7 @@ up. That profile will be something along the lines of
 ```{r, eval=FALSE}
 library(distcomp)
 distcompSetup(workspace = "full_path_to_workspace_directory",
-              ssl.verifyhost = 0L, ssl.verifypeer = 0L)
+              ssl_verifyhost = 0L, ssl_verifypeer = 0L)
 ```
 where the workspace is a directory that the `opencpu` server can
 serialize objects to. On Unix or Mac, the above can be inserted into
@@ -54,4 +54,4 @@ many tries, you were better off using the ip address `127.0.0.1` in
 the url in place of `localhost` due to those DNS problems.
 
 We no longer see this problem in recent versions of Yosemite
-(10.10.5).
+(10.10.5+).

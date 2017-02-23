@@ -1,11 +1,11 @@
-30da2d4af718c39ed2b4557451a247be *DESCRIPTION
+4ee4d6d4d58073286e6246c48bca7c52 *DESCRIPTION
 54b9905946d86834caa6981e542de9d6 *NAMESPACE
 c0892528b4f1abafaf2f27599687e7f3 *R/coxstuff.R
-1a02d93f49fb077bc6553bb708a0c5c2 *R/distcomp.R
+65bf143050146fe31dd6d2064d90d463 *R/distcomp.R
 240a035997d6d4bc51c9530a927980c5 *R/firstlib.R
 fa45f2d274cfe03e4e1289dde138ed6e *R/survivalstuff.R
 b3111b5935f40c4e934d213f2810def0 *R/svdstuff.R
-10e00adad3aface32e84e7b1a9464bef *README.md
+edc466a791ea4cc1eb6d74525c5a6fb6 *README.md
 f55d2f79fb025883510ec2514585e9a0 *inst/COPYRIGHTS
 564b4f9fa04440e4bae3b6e84a162d79 *inst/doc/examples.html
 d5682bdb103251a07556b176e2758be5 *inst/doc/examples.pdf
@@ -48,12 +48,11 @@ bfed05842f8ea7670bf61c27d3be3e6f *inst/webApps/setupMasterApp/server.R
 32b5b94f5c69630fe0d6dadae77472ed *inst/webApps/setupWorkerApp/setupSVDWorker/server.R
 417ca57bfc571a79d163ac7908ad506f *inst/webApps/setupWorkerApp/setupSVDWorker/ui.R
 58129d4819d02420b60ee4221c27a539 *inst/webApps/setupWorkerApp/ui.R
-54b0286966746dc96100046e776ba142 *man/CoxMaster.Rd
 ed5bfaa43126da24c31b43095e4489bf *man/CoxWorker.Rd
-7341cd20fc6eba66be455ae218a899d8 *man/SVDMaster.Rd
 0605c999fb52048917e5a4abc4dfbc62 *man/SVDWorker.Rd
 cb5ef79fab0007b884045ebc334048fc *man/availableComputations.Rd
 3615e80f7aa76d6ec7e2b0360ad1219e *man/availableDataSources.Rd
+54b0286966746dc96100046e776ba142 *man/coxMaster.Rd
 feb480ae8cab2c4d556f4081b3deab29 *man/createInstanceObject.Rd
 4d3d334a26200acbd5fb6c63d4120107 *man/dccoxph.Rd
 5a672bf0b6c9117ef3427762b3ae6592 *man/defineNewComputation.Rd
@@ -74,6 +73,7 @@ aeff923c00cdeb0352523d242b341188 *man/getConfig.Rd
 930804a52ddbfdeaf27a2c7e931b1e23 *man/setComputationInfo.Rd
 ec12e96e28c40088f1caf32079a2bd79 *man/setupMaster.Rd
 d31c9e31255fdd524fbbade6cdbf9e46 *man/setupWorker.Rd
+7341cd20fc6eba66be455ae218a899d8 *man/svdMaster.Rd
 96462c33b376554ca1cc49abb6001b85 *man/uploadNewComputation.Rd
 1a907d32f29b71744248ac7223af8647 *man/writeCode.Rd
 9d58cebadc5a235bb5860076bb15ce10 *src/chinv2.c
@@ -83,6 +83,6 @@ d31c9e31255fdd524fbbade6cdbf9e46 *man/setupWorker.Rd
 e95afa599b5a2e8cc4e8a24a56b27879 *src/coxfit6.c
 6a85c40ec6742f6986c0e53932a5d1da *src/coxmart.c
 c84812b76eb487d1681437f9e00aae17 *src/dmatrix.c
-7fb103185cc074737ba1b86340c91853 *src/init.c
+52cf3522b1f6f4163a427f9fd2f18afa *src/init.c
 80beea3c5d4e2c8495444dfcbe497016 *src/survS.h
 e1491093658ffa2fb7f93033301e46c4 *src/survproto.h
