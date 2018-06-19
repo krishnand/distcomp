@@ -39,6 +39,7 @@ CoxWorker <- R6Class("CoxWorker",
                         private$p <- result$p
                         stopifnot(self$kosher())
                       },
+                      getFitter = function() private$fitter,
                       getP = function(...) private$p,
                       getStateful = function() private$stateful,
                       logLik = function(beta, ...) {
@@ -70,12 +71,13 @@ CoxWorker <- R6Class("CoxWorker",
 #'         by aggregating the values at each site. The return value is numeric scalar with
 #'         two attributes: \code{gradient} contains the score vector, and \code{hessian}
 #'         contains the estimated hessian matrix}
-#'   \item{\code{addSite(name, url)}}{Add a worker
-#'         site for participating in the distributed computation}
+#'   \item{\code{addSite(name, url, token=NULL)}}{Add a worker
+#'         site for participating in the distributed computation. When using MRS specify a valid access token for target site's webservice endpoint.}
 #'   \item{\code{var(beta, ...)}}{Compute the variance of the parameter vector beta}
 #'   \item{\code{kosher()}}{Check if inputs and state of object are sane. For future use}
 #'   \item{\code{getP()}}{Returns the dimension of the parameter vector}
 #'   \item{\code{run()}}{Run the fitting iterations and save the result}
+#'   \item{\code{runMRS(jobId)}}{Run the fitting iterations using Microsoft R Server and save the result. Specify a jobId that will be used to correlate with the sites.}
 #'   \item{\code{summary()}}{Return a summary data frame columns for \code{coef}, \code{exp(coef)},
 #'         standard error, z-score, and p-value for each parameter in the model following
 #'         the same format as the \code{survival} package}
@@ -101,6 +103,25 @@ CoxMaster <- R6Class("CoxMaster",
                          ## Should really examine result here.
                          .deSerialize(q)
                        },
+                       mapFnMRS = function(site, jobid, beta) {
+
+                              print(sprintf("Executing mapFnMRS for site '%s' with the following payload...",
+                                            as.character(site$url)))
+                              payload <- list(projectname = as.character(private$defnId),
+                                              jobid = as.character(jobid),
+                                              method = "logLik",
+                                              methodparams = toJSON(list("beta"=beta)))
+                              q <- POST(url=site$url,
+                                   body = payload,
+                                   add_headers("Content-Type" = "application/json", "Authorization" = as.character(site$token)),
+                                   encode = "json")
+
+                              print("Finished executing mapFnMRS iteration...Parsing results")
+                              resultJSON <- jsonlite::fromJSON(content(q, "text"))
+                              logLikResultList = as.list(resultJSON$outputParameters$Result)
+                              print(logLikResultList, row.names = FALSE)
+                              return(logLikResultList)
+                       },
                        result = list(),
                        debug = FALSE
                      ),
@@ -116,8 +137,8 @@ CoxMaster <- R6Class("CoxMaster",
                          ' Check for sanity'
                          TRUE
                        },
-                       logLik = function(beta) {
-                         'Compute the (partial) log-likelihood on all data'
+                       logLik = function(beta, jobid = NULL, MRSContext=FALSE) {
+                         print('Compute the (partial) log-likelihood on all data')
                          debug <- private$debug
                          if (debug) {
                            print("beta")
@@ -125,19 +146,30 @@ CoxMaster <- R6Class("CoxMaster",
                          }
                          sites <- private$sites
                          n <- length(sites)
-                         results <- Map(private$mapFn, sites, rep(list(beta), n))
+                         if(MRSContext){
+                           print('Pre::LogLik using MRSContext')
+                           results <- Map(private$mapFnMRS, sites, jobid, rep(list(beta), n))
+                           print('Post::LogLik using MRSContext')
+                         }
+                         else {
+                           results <- Map(private$mapFn, sites, rep(list(beta), n))
+                         }
+
+                         print('Computing aggregates...')
                          value <- Reduce(f = sum, lapply(results, function(x, y) x[[y]], y = "value"))
                          gradient <- Reduce(f = '+', lapply(results, function(x, y) x[[y]], y = "gradient"))
                          hessian <- Reduce(f = '+', lapply(results, function(x, y) x[[y]], y = "hessian"))
                          attr(value, "gradient") <- gradient
                          attr(value, "hessian") <- hessian
+                         
+                         print(value)
                          if (debug) {
                            print("value")
                            print(value)
                          }
                          value
                        },
-                       addSite = function(name, url) {
+                       addSite = function(name, url, token = NULL) {
                          'Add a site identified by url with a name'
                          ## critical section start
                          ## This is the time to cache "p" and check it
@@ -145,15 +177,99 @@ CoxMaster <- R6Class("CoxMaster",
                          n <- length(private$sites)
                          localhost <- (grepl("^http://localhost", url) ||
                                          grepl("^http://127.0.0.1", url))
-                         private$sites[[n+1]] <- list(name = name, url = url,
+                         private$sites[[n+1]] <- list(name = name,
+                                                      url = url,
+                                                      token = token,
                                                       localhost = localhost,
                                                       dataFileName = if (localhost) paste0(name, ".rds") else NULL)
                          ## critical section end
+                       },
+                       runMRS = function(jobId) {
+
+                         print("In runMRS method...")
+                         ## Augment each site with object instance ids
+                         private$sites <- sites <- lapply(private$sites,
+                                                          function(x) list(name = x$name,
+                                                                           url = x$url,
+                                                                           token = x$token,
+                                                                           jobId = jobId))
+
+                         ## stop if no sites
+                         debug <- private$debug
+                         if (debug) {
+                           print("run(): checking p")
+                         }
+
+                         pVals <- sapply(sites,
+                                         function(x) {
+                                            payload <- list(projectname = as.character(private$defnId),
+                                                        jobid = as.character(jobId),
+                                                        method="getP",
+                                                        methodparams = toJSON(list()))
+                                            print(sprintf("runMRS: Calling ProcessJob for site '%s' ", as.character(x$url)))
+                                            print(sprintf("runMRS: Auth header '%s' ", as.character(x$token)))
+                                            print(payload, row.names = FALSE)
+
+                                            q <- POST(url = x$url,
+                                                      body = payload,
+                                                      add_headers("Content-Type" = "application/json",
+                                                                  "Authorization" = as.character(x$token)),
+                                                      encode = "json")
+                                            resultJSON <- jsonlite::fromJSON(content(q, "text"))
+                                            pVal = as.numeric(resultJSON$outputParameters$Result[1])
+                                            print(sprintf("runMRS: GetP Return value is '%d'", pVal))
+                                            return(pVal)
+                                         })
+
+                         print("Printing pVals...")
+                         if (debug) {
+                           print(pVals)
+                         }
+                         if (any(pVals != pVals[1])) {
+                           stop("run(): Heterogeneous sites! Stopping!")
+                         }
+                         p <- pVals[1]
+                         if (debug) {
+                           print(paste("p is ", p))
+                         }
+
+                         ## DO Newton-Raphson
+                         control <- coxph.control()
+                         prevBeta <- beta <- rep(0, p)
+                         m <- prevloglik <- self$logLik(beta, jobid = jobId, MRSContext = TRUE)
+                         iter <- 0
+                         returnCode <- 0
+                         repeat {
+                           beta <- beta - solve(attr(m, "hessian")) %*% attr(m, "gradient")
+                           iter <- iter + 1
+                           m <- self$logLik(beta, jobid = jobId, MRSContext = TRUE)
+                           if (abs(m - prevloglik) < control$eps) {
+                             break
+                           }
+                           if (iter >= control$iter.max) {
+                             returnCode <- 1
+                             break
+                           }
+                           prevBeta <- beta
+                           prevloglik <- m
+                           if (debug) {
+                             print(beta)
+                           }
+                         }
+                         private$result <- result <- list(beta = beta,
+                                                          var = -solve(attr(m, "hessian")),
+                                                          gradient = attr(m, "gradient"),
+                                                          iter = iter,
+                                                          returnCode = returnCode)
+
+                         print("runMRS: Returning result..")
+                         return(result)
                        },
                        run = function() {
                          'Run estimation'
                          ## Create an instance Id
                          instanceId <- generateId(object=list(Sys.time(), self))
+
                          ## Augment each site with object instance ids
                          private$sites <- sites <- lapply(private$sites,
                                                           function(x) list(name = x$name,
